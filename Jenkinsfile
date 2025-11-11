@@ -27,14 +27,10 @@ pipeline {
         stage('1: Code Quality & Unit Tests') {
             steps {
                 dir('backend') {
-                    // Install Python requirements
-                    sh 'pip install -r requirements.txt'
+                    // Use a clean Python Docker container to run your pre-build steps
+                    sh 'docker run --rm -v ${PWD}:/app -w /app python:3.10-slim sh -c "pip install -r requirements.txt && pytest && flake8"'
                     
-                    echo 'Running Backend Unit Tests...'
-                    sh 'echo "Tests run successfully."' 
-                    
-                    echo 'Running Code Linting...'
-                    sh 'echo "Linting complete."' 
+                    echo 'Unit Tests and Linting completed inside container.'
                 }
             }
         }

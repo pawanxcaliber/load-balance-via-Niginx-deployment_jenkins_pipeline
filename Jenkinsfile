@@ -28,21 +28,20 @@ pipeline {
     stage('1: Code Quality & Unit Tests') {
             steps {
                 dir('backend') {
-                    // Use Groovy's triple quotes for clean command passing
                     sh """
-                        # Mount only the specific file and ensure the working directory is set.
-                        # We escape the volume mount path to guarantee correct resolution of PWD.
+                        # Mount the host directory to a safe, unused path (/tmp/workspace)
+                        # and then change the working directory inside the container to that path.
                         docker run --rm \\
-                            -v \${PWD}/requirements.txt:/app/requirements.txt \\
-                            -w /app \\
+                            -v \${PWD}:/tmp/workspace \\
+                            -w /tmp/workspace \\
                             python:3.10-slim \\
                             /bin/bash -c \
                             "pip install --no-cache-dir -r requirements.txt && \
-                             echo 'Dependencies installed.' && exit 0"
+                             pytest && \
+                             flake8"
                     """
-                    // Since the dependencies are installed, the next steps (pytest/flake8) need the rest of the code.
-                    // Let's defer pytest and flake8 until the main Docker build (Stage 4) which handles the whole directory.
-                    echo 'Requirements file successfully mounted and dependencies installed.'
+                    
+                    echo 'Unit Tests and Linting completed inside container.'
                 }
             }
         }

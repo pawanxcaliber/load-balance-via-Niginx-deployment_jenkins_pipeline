@@ -28,17 +28,18 @@ pipeline {
                     echo 'Setting up Docker environment for Minikube...'
                     sh 'eval $(minikube docker-env)'
                     
-                    echo 'Installing Node.js and Snyk CLI with sudo...'
+                    echo 'Installing Node.js and Snyk CLI as root...'
+                    // Use 'su -c' to switch the user executing the commands to root
                     sh '''
-                        # Run all commands that require root access using 'sudo'
-                        sudo apt-get update
-                        sudo apt-get install -y curl
-                        sudo curl -sL https://deb.nodesource.com/setup_18.x | sudo bash -
-                        sudo apt-get install -y nodejs
-                        
-                        # npm install often needs sudo for global packages
-                        sudo npm install -g snyk
-                        echo 'Snyk CLI installed and ready.'
+                        su -c "
+                            apt-get update
+                            apt-get install -y curl
+                            curl -sL https://deb.nodesource.com/setup_18.x | bash -
+                            apt-get install -y nodejs
+                            
+                            npm install -g snyk
+                            echo 'Snyk CLI installed and ready.'
+                        "
                     '''
                 }
             }

@@ -52,7 +52,7 @@ pipeline {
                         echo '✅ Test files found — running pytest and flake8...'; \
                         pytest && flake8; \
                     else
-                        echo '⚠️  No test files found — skipping pytest.'; \
+                        echo '⚠️  No test files found — skipping pytest, running flake8 only.'; \
                         flake8; \
                     fi
                 "
@@ -63,6 +63,7 @@ pipeline {
         }
     }
 }
+
 
         // --- STAGE 4: SONARQUBE ANALYSIS ---
         stage('2: SonarQube Analysis') {

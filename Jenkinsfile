@@ -28,20 +28,28 @@ pipeline {
                     echo 'Setting up Docker environment for Minikube...'
                     sh 'eval $(minikube docker-env)'
                     
-                    echo 'Installing Snyk CLI using a dedicated root container...'
+                    // --- OPTIMIZATION: Check if Snyk is already installed ---
+                    def snykPath = "/usr/local/bin/snyk"
                     
-                    // We run an Alpine container (small) as root, mount the Jenkins workspace
-                    // and use npm/apk to install Snyk into the host's (Jenkins container's) PATH.
-                    sh '''
-                        # Install Node.js and Snyk CLI directly onto the Jenkins agent's filesystem 
-                        # by mounting the /usr/local directory where binaries are stored.
-                        docker run --rm \\
-                            -v /usr/local:/mnt/local \\
-                            node:18-alpine \\
-                            /bin/sh -c "npm install -g snyk --prefix /mnt/local"
-                    '''
-                    
-                    echo 'Snyk CLI installed and ready in /usr/local/bin.'
+                    // The 'which' command finds the binary; '!' in Groovy is logical NOT.
+                    // 'catchError' allows the pipe to continue if 'which' fails (returns 1).
+                    def snykInstalled = sh(script: "test -x ${snykPath} && echo 'true'", returnStdout: true, catchError: true).trim() == 'true'
+
+                    if (snykInstalled) {
+                        echo "✅ Snyk CLI already found at ${snykPath}. Skipping installation."
+                    } else {
+                        echo 'Snyk CLI not found. Installing Snyk CLI using a dedicated root container...'
+                        
+                        sh '''
+                            # Install Node.js and Snyk CLI directly onto the Jenkins agent's filesystem 
+                            # by mounting the /usr/local directory where binaries are stored.
+                            docker run --rm \\
+                                -v /usr/local:/mnt/local \\
+                                node:18-alpine \\
+                                /bin/sh -c "npm install -g snyk --prefix /mnt/local"
+                        '''
+                        echo 'Snyk CLI installed and ready in /usr/local/bin.'
+                    }
                 }
             }
         }

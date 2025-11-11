@@ -17,14 +17,9 @@ pipeline {
         stage('0: Setup Minikube Environment') {
             steps {
                 script {
+                    // CRITICAL: Connects the Jenkins agent's Docker client to Minikube's internal Docker daemon.
                     echo 'Setting up Docker environment for Minikube...'
                     sh 'eval $(minikube docker-env)'
-                    
-                    // --- NEW: Install Docker Client ---
-                    // The Jenkins LTS image is based on Debian/Ubuntu, so apt-get works.
-                    echo 'Installing Docker Client binary...'
-                    sh 'apt-get update && apt-get install -y docker.io' 
-                    // ---------------------------------
                 }
             }
         }

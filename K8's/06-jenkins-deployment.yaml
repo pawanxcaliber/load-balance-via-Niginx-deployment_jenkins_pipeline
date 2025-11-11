@@ -14,7 +14,7 @@ spec:
       labels:
         app: jenkins-server
     spec:
-      containers:
+      containers:containers:
       - name: jenkins
         image: jenkins/jenkins:lts
         ports:
@@ -23,18 +23,26 @@ spec:
         volumeMounts:
         - name: jenkins-home
           mountPath: /var/jenkins_home
-        # --- DooD FIX: Mount the Docker socket ---
+        # --- FIX 1: Mount the Docker socket (For communication) ---
         - name: docker-socket
           mountPath: /var/run/docker.sock
+        # --- FIX 2: Mount the Docker binary (For the 'docker' command) ---
+        - name: docker-bin
+          mountPath: /usr/bin/docker
       volumes:
       - name: jenkins-home
         persistentVolumeClaim:
           claimName: jenkins-pvc
-      # --- DooD FIX: Define the Docker socket volume ---
+      # --- FIX 3: Define the Docker socket volume ---
       - name: docker-socket
         hostPath:
           path: /var/run/docker.sock
           type: Socket
+      # --- FIX 4: Define the Docker binary volume ---
+      - name: docker-bin
+        hostPath:
+          path: /usr/bin/docker
+          type: File
 ---
 apiVersion: v1
 kind: Service

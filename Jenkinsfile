@@ -31,33 +31,33 @@ pipeline {
         }
 
         // --- STAGE 3: CODE QUALITY (Flake8 only) ---
-stage('1: Code Quality (Flake8 only)') {
-    steps {
-        dir('backend') {
-            sh '''
-                echo "Creating Python lint container..."
-                CONTAINER_ID=$(docker create -it python:3.10-slim tail -f /dev/null)
+        stage('1: Code Quality (Flake8 only)') {
+            steps {
+                dir('backend') {
+                    sh '''
+                        echo "Creating Python lint container..."
+                        CONTAINER_ID=$(docker create -it python:3.10-slim tail -f /dev/null)
 
-                echo "Starting container..."
-                docker start $CONTAINER_ID
+                        echo "Starting container..."
+                        docker start $CONTAINER_ID
 
-                echo "Copying backend source code into container..."
-                docker cp . $CONTAINER_ID:/app
+                        echo "Copying backend source code into container..."
+                        docker cp . $CONTAINER_ID:/app
 
-                echo "Running flake8 linting inside container..."
-                docker exec $CONTAINER_ID /bin/bash -c "
-                    cd /app && \
-                    pip install --no-cache-dir -r requirements.txt && \
-                    echo '✅ Running flake8 for lint check only...' && \
-                    flake8
-                "
+                        echo "Running flake8 linting inside container..."
+                        docker exec $CONTAINER_ID /bin/bash -c "
+                            cd /app && \
+                            pip install --no-cache-dir -r requirements.txt && \
+                            echo '✅ Running flake8 for lint check only...' && \
+                            flake8
+                        "
 
-                echo "Cleaning up container..."
-                docker rm -f $CONTAINER_ID
-            '''
+                        echo "Cleaning up container..."
+                        docker rm -f $CONTAINER_ID
+                    '''
+                }
+            }
         }
-    }
-}
 
         // --- STAGE 4: SONARQUBE ANALYSIS ---
         stage('2: SonarQube Analysis') {

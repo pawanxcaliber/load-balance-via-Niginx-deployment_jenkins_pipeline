@@ -22,24 +22,23 @@ pipeline {
         }
 
         // --- STAGE 2: MINIKUBE ENVIRONMENT SETUP ---
+        // This stage is simplified as the crucial Docker setup is moved to Stage 1.
         stage('0: Setup Minikube Environment') {
             steps {
-                script {
-                    echo 'Setting up Docker environment for Minikube...'
-                    sh 'eval $(minikube docker-env)'
-                }
+                echo 'Docker environment setup is deferred to Stage 1 for robustness.'
             }
         }
         
-        // --- STAGE 3: SECURITY SCAN (SNYK) ---
-        // CRITICAL FIX: Use the 'docker.image().inside()' syntax inside a script block 
-        // to bypass the 'Invalid agent type' error.
         // --- STAGE 3: SECURITY SCAN (SNYK) ---
         stage('1: Snyk Vulnerability Scan') {
             steps {
                 dir('backend') {
                     script {
-                        // Launch the Snyk container to run the scan
+                        // CRITICAL FIX: Set up Docker environment immediately before using the Docker plugin
+                        sh 'eval $(minikube docker-env)' 
+                        echo 'Docker environment setup confirmed.'
+                        
+                        // Launch the Snyk container (snyk/snyk) to run the scan
                         docker.image('snyk/snyk').withRun('-v /var/run/docker.sock:/var/run/docker.sock') { container ->
                             echo 'Running Snyk Open Source dependency vulnerability scan inside snyk/snyk container...'
                             
@@ -51,10 +50,10 @@ pipeline {
                             
                             // Scan infrastructure (Dockerfile)
                             sh "snyk monitor --file=Dockerfile --docker"
-                        } // end of withRun container block
-                    } // end of script block
-                } // end of dir block
-            } // end of steps block
+                        }
+                    }
+                }
+            }
         }
 
         // --- STAGE 4: CODE QUALITY (Flake8) ---

@@ -1,7 +1,4 @@
-# Production dependencies
 Flask
 flask-cors
 gunicorn
-
-# Dev dependencies
 flake8

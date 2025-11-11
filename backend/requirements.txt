@@ -1,3 +1,8 @@
+# Production dependencies
 Flask
-gunicorn
 flask-cors
+gunicorn
+
+# Dev dependencies
+pytest
+flake8

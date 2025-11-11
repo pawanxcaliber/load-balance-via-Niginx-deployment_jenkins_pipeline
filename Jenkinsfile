@@ -28,15 +28,27 @@ pipeline {
     steps {
         dir('backend') {
             sh '''
-                pip install -r requirements.txt
-                pytest
-                flake8
+                echo "Creating test container..."
+                CONTAINER_ID=$(docker create python:3.10-slim)
+                
+                echo "Copying source code into container..."
+                docker cp . $CONTAINER_ID:/app
+                
+                echo "Running tests inside container..."
+                docker start -a $CONTAINER_ID
+                docker exec $CONTAINER_ID /bin/bash -c "
+                    cd /app && \
+                    pip install --no-cache-dir -r requirements.txt && \
+                    pytest && \
+                    flake8
+                "
+                
+                echo "Cleaning up..."
+                docker rm -f $CONTAINER_ID
             '''
         }
     }
 }
-
-
 
         stage('2: SonarQube Analysis') {
             steps {

@@ -26,25 +26,19 @@ pipeline {
 
         stage('1: Code Quality & Unit Tests') {
     stage('1: Code Quality & Unit Tests') {
-            steps {
-                dir('backend') {
-                    sh """
-                        # Mount the host directory to a safe, unused path (/tmp/workspace)
-                        # and then change the working directory inside the container to that path.
-                        docker run --rm \\
-                            -v \${PWD}:/tmp/workspace \\
-                            -w /tmp/workspace \\
-                            python:3.10-slim \\
-                            /bin/bash -c \
-                            "pip install --no-cache-dir -r requirements.txt && \
-                             pytest && \
-                             flake8"
-                    """
-                    
-                    echo 'Unit Tests and Linting completed inside container.'
-                }
-            }
+    steps {
+        dir('backend') {
+            sh '''
+                docker run --rm \
+                    -v $(pwd):/tmp/workspace \
+                    -w /tmp/workspace \
+                    python:3.10-slim \
+                    /bin/bash -c "pip install -r requirements.txt && pytest && flake8"
+            '''
         }
+    }
+}
+
         stage('2: SonarQube Analysis') {
             steps {
                 // Uses the pre-configured SonarQube server credentials and environment variables

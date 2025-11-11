@@ -25,19 +25,26 @@ pipeline {
         }
 
         stage('1: Code Quality & Unit Tests') {
-    steps {
-        dir('backend') {
-            sh '''
-                docker run --rm -v ${PWD}:/app -w /app python:3.10-slim sh -c \
-                "pip install --no-cache-dir -r requirements.txt && \
-                pytest && \
-                flake8"
-            '''
-            
-            echo 'Unit Tests and Linting completed inside container.'
+    stage('1: Code Quality & Unit Tests') {
+            steps {
+                dir('backend') {
+                    // Using triple double quotes and explicit shell execution for reliability.
+                    sh """
+                        # We use /bin/bash -c for robust execution inside the container
+                        docker run --rm \\
+                            -v \${PWD}:/app \\
+                            -w /app \\
+                            python:3.10-slim \\
+                            /bin/bash -c \
+                            "pip install --no-cache-dir -r requirements.txt; \
+                             pytest; \
+                             flake8"
+                    """
+                    
+                    echo 'Unit Tests and Linting completed inside container.'
+                }
+            }
         }
-    }
-}
 
         stage('2: SonarQube Analysis') {
             steps {

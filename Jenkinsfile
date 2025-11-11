@@ -28,9 +28,8 @@ pipeline {
     stage('1: Code Quality & Unit Tests') {
             steps {
                 dir('backend') {
-                    // Using triple double quotes and explicit shell execution for reliability.
                     sh """
-                        # We use /bin/bash -c for robust execution inside the container
+                        # We use /bin/bash -c to guarantee proper command chaining and file access
                         docker run --rm \\
                             -v \${PWD}:/app \\
                             -w /app \\
@@ -45,7 +44,6 @@ pipeline {
                 }
             }
         }
-
         stage('2: SonarQube Analysis') {
             steps {
                 // Uses the pre-configured SonarQube server credentials and environment variables

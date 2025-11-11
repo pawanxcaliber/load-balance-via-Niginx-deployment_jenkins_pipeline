@@ -76,7 +76,6 @@ pipeline {
                         docker cp . $CONTAINER_ID:/app
 
                         echo "Running flake8 linting inside container..."
-                        # Note: The backslashes (\) ensure the internal quotes and newlines are preserved.
                         docker exec $CONTAINER_ID /bin/bash -c "
                             cd /app && \\
                             pip install --no-cache-dir -r requirements.txt && \\
@@ -90,7 +89,6 @@ pipeline {
                 }
             }
         }
-
         // --- STAGE 5: DOCKER BUILD & TAG (Minikube internal registry only) ---
         stage('3: Docker Build & Tag') {
             steps {

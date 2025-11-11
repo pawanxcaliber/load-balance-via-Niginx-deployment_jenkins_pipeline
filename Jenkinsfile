@@ -32,33 +32,33 @@ pipeline {
 
         // --- STAGE 3: CODE QUALITY & UNIT TESTS ---
         stage('1: Code Quality & Unit Tests') {
-            steps {
-                dir('backend') {
-                    sh '''
-                        echo "Creating Python test container..."
-                        CONTAINER_ID=$(docker create -it python:3.10-slim tail -f /dev/null)
+    steps {
+        dir('backend') {
+            sh '''
+                echo "Creating Python test container..."
+                CONTAINER_ID=$(docker create -it python:3.10-slim tail -f /dev/null)
 
-                        echo "Starting container..."
-                        docker start $CONTAINER_ID
+                echo "Starting container..."
+                docker start $CONTAINER_ID
 
-                        echo "Copying backend source code into container..."
-                        docker cp . $CONTAINER_ID:/app
+                echo "Copying backend source code into container..."
+                docker cp . $CONTAINER_ID:/app
 
-                        echo "Running tests inside container..."
-                        docker exec $CONTAINER_ID /bin/bash -c "
-                            cd /app && \
-                            pip install --no-cache-dir -r requirements.txt && \
-                            pip install pytest flake8 && \
-                            pytest || true && \
-                            flake8
-                        "
+                echo "Running tests inside container..."
+                docker exec $CONTAINER_ID /bin/bash -c "
+                    cd /app && \
+                    pip install --no-cache-dir -r requirements.txt && \
+                    pip install pytest flake8 && \
+                    pytest || true && \
+                    flake8
+                "
 
-                        echo "Cleaning up container..."
-                        docker rm -f $CONTAINER_ID
-                    '''
-                }
-            }
+                echo "Cleaning up container..."
+                docker rm -f $CONTAINER_ID
+            '''
         }
+    }
+}
 
         // --- STAGE 4: SONARQUBE ANALYSIS ---
         stage('2: SonarQube Analysis') {

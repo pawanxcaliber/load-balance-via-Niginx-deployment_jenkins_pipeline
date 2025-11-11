@@ -28,18 +28,23 @@ pipeline {
                     echo 'Setting up Docker environment for Minikube...'
                     sh 'eval $(minikube docker-env)'
                     
-                    echo 'Installing Node.js and Snyk CLI as root...'
-                    // Use 'su -c' to switch the user executing the commands to root
+                    echo 'Installing Node.js and Snyk CLI...'
                     sh '''
-                        su -c "
-                            apt-get update
-                            apt-get install -y curl
-                            curl -sL https://deb.nodesource.com/setup_18.x | bash -
-                            apt-get install -y nodejs
-                            
-                            npm install -g snyk
-                            echo 'Snyk CLI installed and ready.'
-                        "
+                        # The safest way is to ensure all operations run without privilege issues.
+                        # This command chain should be run as root (or a user with permissions).
+                        
+                        # Fix: Create or ensure permissions for the apt-get lists directory
+                        mkdir -p /var/lib/apt/lists/partial
+                        chmod 755 /var/lib/apt/lists/partial
+                        
+                        # Installation steps
+                        apt-get update
+                        apt-get install -y curl
+                        curl -sL https://deb.nodesource.com/setup_18.x | bash -
+                        apt-get install -y nodejs
+                        
+                        npm install -g snyk
+                        echo 'Snyk CLI installed and ready.'
                     '''
                 }
             }

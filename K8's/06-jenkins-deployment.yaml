@@ -23,10 +23,18 @@ spec:
         volumeMounts:
         - name: jenkins-home
           mountPath: /var/jenkins_home
+        # --- DooD FIX: Mount the Docker socket ---
+        - name: docker-socket
+          mountPath: /var/run/docker.sock
       volumes:
       - name: jenkins-home
         persistentVolumeClaim:
           claimName: jenkins-pvc
+      # --- DooD FIX: Define the Docker socket volume ---
+      - name: docker-socket
+        hostPath:
+          path: /var/run/docker.sock
+          type: Socket
 ---
 apiVersion: v1
 kind: Service

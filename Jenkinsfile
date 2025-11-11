@@ -25,15 +25,15 @@ pipeline {
         }
 
         stage('1: Code Quality & Unit Tests') {
-            steps {
-                dir('backend') {
-                    // Use a clean Python Docker container to run your pre-build steps
-                    sh 'docker run --rm -v ${PWD}:/app -w /app python:3.10-slim sh -c "pip install -r requirements.txt && pytest && flake8"'
-                    
-                    echo 'Unit Tests and Linting completed inside container.'
-                }
-            }
+    steps {
+        dir('backend') {
+            // Check what files are visible inside the container's /app directory
+            sh 'docker run --rm -v ${PWD}:/app -w /app python:3.10-slim ls -al /app'
+            
+            echo 'Files listed for debugging.'
         }
+    }
+}
 
         stage('2: SonarQube Analysis') {
             steps {

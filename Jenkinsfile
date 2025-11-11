@@ -27,10 +27,14 @@ pipeline {
         stage('1: Code Quality & Unit Tests') {
     steps {
         dir('backend') {
-            // Check what files are visible inside the container's /app directory
-            sh 'docker run --rm -v ${PWD}:/app -w /app python:3.10-slim ls -al /app'
+            sh '''
+                docker run --rm -v ${PWD}:/app -w /app python:3.10-slim sh -c \
+                "pip install --no-cache-dir -r requirements.txt && \
+                pytest && \
+                flake8"
+            '''
             
-            echo 'Files listed for debugging.'
+            echo 'Unit Tests and Linting completed inside container.'
         }
     }
 }

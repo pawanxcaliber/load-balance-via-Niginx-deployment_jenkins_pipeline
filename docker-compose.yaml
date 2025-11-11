@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  # 1. Database/Backend Service (Flask)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    # Use a volume to persist the SQLite file (essential)
+    volumes:
+      - db_data:/app
+    environment:
+      # Use the default DB_FILE in app.py
+      - DB_FILE=names.db
+
+  # 2. Frontend Service (Nginx)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  db_data:

@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sonarqube-deployment
+  labels:
+    app: sonarqube
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sonarqube
+  template:
+    metadata:
+      labels:
+        app: sonarqube
+    spec:
+      containers:
+      - name: sonarqube
+        image: sonarqube:lts-community
+        ports:
+        - containerPort: 9000
+        env:
+          # Simple database setup for lab environment (H2 database)
+          - name: SONARQUBE_JDBC_URL
+            value: jdbc:h2:file:./data/h2/sonar;DB_CLOSE_DELAY=-1;MODE=LEGACY
+        # SonarQube typically requires more memory; set limits as needed
+        resources:
+          limits:
+            memory: "2048Mi"
+          requests:
+            memory: "1024Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sonarqube-service
+spec:
+  type: NodePort # Exposes SonarQube externally
+  ports:
+  - port: 9000
+    targetPort: 9000
+    nodePort: 30001 # External port for SonarQube
+    name: http
+  selector:
+    app: sonarqube

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>DevSecOps Name Service</title>
+</head>
+<body>
+    <h1>Enter a Name</h1>
+    <form id="nameForm">
+        <input type="text" id="nameInput" placeholder="Your Name" required>
+        <button type="submit">Store Name</button>
+    </form>
+    <hr>
+    <h2>Stored Names</h2>
+    <ul id="nameList">
+        </ul>
+
+    <script>
+        const backendUrl = "http://localhost:5000"; // Placeholder: will use K8s service name later
+
+        document.getElementById('nameForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('nameInput').value;
+            await fetch(`${backendUrl}/store`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: name })
+            });
+            document.getElementById('nameInput').value = '';
+            fetchNames();
+        });
+
+        async function fetchNames() {
+            const response = await fetch(`${backendUrl}/names`);
+            const data = await response.json();
+            const list = document.getElementById('nameList');
+            list.innerHTML = '';
+            data.forEach(item => {
+                const li = document.createElement('li');
+                li.textContent = item[1]; // Assuming item is [id, name]
+                list.appendChild(li);
+            });
+        }
+        fetchNames();
+    </script>
+</body>
+</html>

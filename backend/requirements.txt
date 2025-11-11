@@ -4,5 +4,4 @@ flask-cors
 gunicorn
 
 # Dev dependencies
-pytest
 flake8

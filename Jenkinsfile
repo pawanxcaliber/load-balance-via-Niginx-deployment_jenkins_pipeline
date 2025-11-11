@@ -25,19 +25,25 @@ pipeline {
         }
 
         stage('1: Code Quality & Unit Tests') {
-    stage('1: Code Quality & Unit Tests') {
     steps {
         dir('backend') {
             sh '''
-                docker run --rm \
-                    -v $(pwd):/tmp/workspace \
-                    -w /tmp/workspace \
-                    python:3.10-slim \
-                    /bin/bash -c "pip install -r requirements.txt && pytest && flake8"
+                # Create a temporary container, copy code inside, run tests
+                docker create --name testcontainer python:3.10-slim
+                docker cp . testcontainer:/app
+                docker start -a testcontainer
+                docker exec testcontainer /bin/bash -c "
+                    cd /app && \
+                    pip install -r requirements.txt && \
+                    pytest && \
+                    flake8
+                "
+                docker rm -f testcontainer
             '''
         }
     }
 }
+
 
         stage('2: SonarQube Analysis') {
             steps {

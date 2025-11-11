@@ -32,38 +32,38 @@ pipeline {
 
         // --- STAGE 3: CODE QUALITY & UNIT TESTS ---
         stage('1: Code Quality & Unit Tests') {
-    steps {
-        dir('backend') {
-            sh '''
-                echo "Creating Python test container..."
-                CONTAINER_ID=$(docker create -it python:3.10-slim tail -f /dev/null)
+            steps {
+                dir('backend') {
+                    sh '''
+                        echo "Creating Python test container..."
+                        CONTAINER_ID=$(docker create -it python:3.10-slim tail -f /dev/null)
 
-                echo "Starting container..."
-                docker start $CONTAINER_ID
+                        echo "Starting container..."
+                        docker start $CONTAINER_ID
 
-                echo "Copying backend source code into container..."
-                docker cp . $CONTAINER_ID:/app
+                        echo "Copying backend source code into container..."
+                        docker cp . $CONTAINER_ID:/app
 
-                echo "Running tests inside container..."
-                docker exec $CONTAINER_ID /bin/bash -c "
-                    cd /app && \
-                    pip install --no-cache-dir -r requirements.txt && \
-                    if ls test_*.py >/dev/null 2>&1; then
-                        echo '✅ Test files found — running pytest and flake8...'; \
-                        pytest && flake8; \
-                    else
-                        echo '⚠️  No test files found — skipping pytest, running flake8 only.'; \
-                        flake8; \
-                    fi
-                "
+                        echo "Running tests inside container..."
+                        docker exec $CONTAINER_ID /bin/bash -c "
+                            cd /app && \
+                            pip install --no-cache-dir -r requirements.txt && \
+                            if ls test_*.py >/dev/null 2>&1; then
+                                echo '✅ Test files found — running pytest and flake8...'; \
+                                pytest || test \$? -eq 5 && echo '⚠️ No tests found — skipping pytest.' || exit 1; \
+                                flake8; \
+                            else
+                                echo '⚠️ No test files found — running flake8 only.'; \
+                                flake8; \
+                            fi
+                        "
 
-                echo "Cleaning up container..."
-                docker rm -f $CONTAINER_ID
-            '''
+                        echo "Cleaning up container..."
+                        docker rm -f $CONTAINER_ID
+                    '''
+                }
+            }
         }
-    }
-}
-
 
         // --- STAGE 4: SONARQUBE ANALYSIS ---
         stage('2: SonarQube Analysis') {

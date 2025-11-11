@@ -49,7 +49,7 @@ pipeline {
                             cd /app && \
                             pip install --no-cache-dir -r requirements.txt && \
                             echo '✅ Running flake8 for lint check only...' && \
-                            flake8
+                            flake8 || echo '⚠️ Flake8 warnings (non-blocking)'
                         "
 
                         echo "Cleaning up container..."

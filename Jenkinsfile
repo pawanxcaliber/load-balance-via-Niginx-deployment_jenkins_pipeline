@@ -29,29 +29,32 @@ pipeline {
         }
 
         stage('1: Code Quality & Unit Tests') {
-            steps {
-                dir('backend') {
-                    sh '''
-                        echo "Creating Python test container..."
-                        CONTAINER_ID=$(docker create -it python:3.10-slim tail -f /dev/null)
+    steps {
+        dir('backend') {
+            sh '''
+                echo "Creating Python test container..."
+                CONTAINER_ID=$(docker create -it python:3.10-slim tail -f /dev/null)
 
-                        echo "Copying backend source code into container..."
-                        docker cp . $CONTAINER_ID:/app
+                echo "Starting container..."
+                docker start $CONTAINER_ID
 
-                        echo "Running tests inside container..."
-                        docker exec $CONTAINER_ID /bin/bash -c "
-                            cd /app && \
-                            pip install --no-cache-dir -r requirements.txt && \
-                            pytest && \
-                            flake8
-                        "
+                echo "Copying backend source code into container..."
+                docker cp . $CONTAINER_ID:/app
 
-                        echo "Cleaning up container..."
-                        docker rm -f $CONTAINER_ID
-                    '''
-                }
-            }
+                echo "Running tests inside container..."
+                docker exec $CONTAINER_ID /bin/bash -c "
+                    cd /app && \
+                    pip install --no-cache-dir -r requirements.txt && \
+                    pytest && \
+                    flake8
+                "
+
+                echo "Cleaning up container..."
+                docker rm -f $CONTAINER_ID
+            '''
         }
+    }
+}
 
         stage('2: SonarQube Analysis') {
             steps {

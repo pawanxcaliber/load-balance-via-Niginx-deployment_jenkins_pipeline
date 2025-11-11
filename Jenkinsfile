@@ -22,8 +22,6 @@ pipeline {
         }
 
         // --- STAGE 2: MINIKUBE ENVIRONMENT SETUP ---
-        // This stage is simplified to only set up the Docker environment.
-        // All Snyk installation logic has been removed.
         stage('0: Setup Minikube Environment') {
             steps {
                 script {
@@ -34,28 +32,28 @@ pipeline {
         }
         
         // --- STAGE 3: SECURITY SCAN (SNYK) ---
-        // CRITICAL FIX: Use the official snyk/snyk Docker image as the agent for this stage.
+        // CRITICAL FIX: Use the 'docker.image().inside()' syntax inside a script block 
+        // to bypass the 'Invalid agent type' error.
         stage('1: Snyk Vulnerability Scan') {
-            // The pipeline temporarily switches the agent for this stage only
-            agent {
-                docker {
-                    image 'snyk/snyk' 
-                    // Mount the Docker socket so Snyk can scan the Dockerfile/image later if needed.
-                    args '-v /var/run/docker.sock:/var/run/docker.sock'
-                }
-            }
             steps {
                 dir('backend') {
-                    echo 'Running Snyk Open Source dependency vulnerability scan inside snyk/snyk container...'
-                    
-                    // The 'snyk' command is now directly available in the container's PATH.
-                    sh "snyk auth \$SNYK_TOKEN"
-                    
-                    // Scan dependencies (Python requirements.txt) - set to fail on high severity
-                    sh "snyk test --file=requirements.txt --severity-threshold=high"
-                    
-                    // Scan infrastructure (Dockerfile)
-                    sh "snyk monitor --file=Dockerfile --docker"
+                    script {
+                        // Use the Scripted Pipeline syntax equivalent of agent { docker { ... } }
+                        // The 'inside' block mounts the current workspace automatically.
+                        // We must explicitly mount the Docker socket to allow scanning Dockerfiles/images.
+                        docker.image('snyk/snyk').withRun('-v /var/run/docker.sock:/var/run/docker.sock') { container ->
+                            echo 'Running Snyk Open Source dependency vulnerability scan inside snyk/snyk container...'
+                            
+                            // The 'snyk' command is available in the container's PATH.
+                            sh "snyk auth \$SNYK_TOKEN"
+                            
+                            // Scan dependencies (Python requirements.txt) - set to fail on high severity
+                            sh "snyk test --file=requirements.txt --severity-threshold=high"
+                            
+                            // Scan infrastructure (Dockerfile)
+                            sh "snyk monitor --file=Dockerfile --docker"
+                        }
+                    }
                 }
             }
         }

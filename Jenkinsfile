@@ -2,11 +2,12 @@
 pipeline {
     agent any
 
+    // Ensure SNYK_TOKEN is configured in Jenkins Credentials
     environment {
         DOCKER_IMAGE_TAG = "v${BUILD_NUMBER}"
         BACKEND_IMAGE = "devsecops-project-backend"
         FRONTEND_IMAGE = "devsecops-project-frontend"
-        SONAR_SCANNER = 'SonarQube_Server'
+        // SNYK_TOKEN will be injected from Jenkins credentials
     }
 
     stages {
@@ -20,18 +21,48 @@ pipeline {
             }
         }
 
-        // --- STAGE 2: MINIKUBE ENVIRONMENT ---
-        stage('0: Setup Minikube Environment') {
+        // --- STAGE 2: MINIKUBE ENVIRONMENT SETUP & DEPENDENCIES ---
+        stage('0: Setup Minikube Environment & Install Snyk') {
             steps {
                 script {
                     echo 'Setting up Docker environment for Minikube...'
                     sh 'eval $(minikube docker-env)'
+                    
+                    echo 'Installing Node.js and Snyk CLI...'
+                    sh '''
+                        # Install Node.js and npm (required for Snyk CLI)
+                        apt-get update
+                        apt-get install -y curl
+                        curl -sL https://deb.nodesource.com/setup_18.x | bash -
+                        apt-get install -y nodejs
+                        
+                        # Install Snyk CLI globally
+                        npm install -g snyk
+                        echo 'Snyk CLI installed and ready.'
+                    '''
                 }
             }
         }
 
-        // --- STAGE 3: CODE QUALITY (Flake8 only) ---
-        stage('1: Code Quality (Flake8 only)') {
+        // --- STAGE 3: SECURITY SCAN (SNYK) ---
+        stage('1: Snyk Vulnerability Scan') {
+            steps {
+                dir('backend') {
+                    echo 'Running Snyk Open Source dependency vulnerability scan...'
+                    // Authenticates the CLI using the injected environment variable
+                    sh 'snyk auth $SNYK_TOKEN'
+                    
+                    // Scan dependencies (Python requirements.txt) - set to fail on high severity
+                    sh 'snyk test --file=requirements.txt --severity-threshold=high'
+                    
+                    // Scan infrastructure (Dockerfile)
+                    sh 'snyk monitor --file=Dockerfile --docker'
+                }
+            }
+        }
+
+        // --- STAGE 4: CODE QUALITY (Flake8) ---
+        stage('2: Code Quality (Flake8 only)') {
             steps {
                 dir('backend') {
                     sh '''
@@ -45,10 +76,11 @@ pipeline {
                         docker cp . $CONTAINER_ID:/app
 
                         echo "Running flake8 linting inside container..."
+                        # Note: The backslashes (\) ensure the internal quotes and newlines are preserved.
                         docker exec $CONTAINER_ID /bin/bash -c "
-                            cd /app && \
-                            pip install --no-cache-dir -r requirements.txt && \
-                            echo '✅ Running flake8 for lint check only...' && \
+                            cd /app && \\
+                            pip install --no-cache-dir -r requirements.txt && \\
+                            echo '✅ Running flake8 for lint check only...' && \\
                             flake8 || echo '⚠️ Flake8 warnings (non-blocking)'
                         "
 
@@ -59,44 +91,20 @@ pipeline {
             }
         }
 
-        // --- STAGE 4: SONARQUBE ANALYSIS ---
-        stage('2: SonarQube Analysis') {
-            steps {
-                withSonarQubeEnv(SONAR_SCANNER) {
-                    sh '''
-                        cd backend && /usr/bin/sonar-scanner \
-                            -Dsonar.projectKey=devsecops-backend \
-                            -Dsonar.sources=. \
-                            -Dsonar.host.url=${SONAR_HOST_URL} \
-                            -Dsonar.login=${SONAR_AUTH_TOKEN} \
-                            -Dsonar.python.file.suffixes=.py
-                    '''
-                }
-            }
-        }
-
-        // --- STAGE 5: QUALITY GATE CHECK ---
-        stage('3: SonarQube Quality Gate Check') {
-            steps {
-                timeout(time: 5, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
-                }
-            }
-        }
-
-        // --- STAGE 6: DOCKER BUILD & TAG ---
-        stage('4: Docker Build & Tag') {
+        // --- STAGE 5: DOCKER BUILD & TAG (Minikube internal registry only) ---
+        stage('3: Docker Build & Tag') {
             steps {
                 script {
                     echo "Building images with tag: ${DOCKER_IMAGE_TAG}"
+                    // Images are built directly into the Minikube internal registry (no push needed)
                     sh "docker build -t ${BACKEND_IMAGE}:${DOCKER_IMAGE_TAG} ./backend"
                     sh "docker build -t ${FRONTEND_IMAGE}:${DOCKER_IMAGE_TAG} ./frontend"
                 }
             }
         }
 
-        // --- STAGE 7: DEPLOY TO KUBERNETES ---
-        stage('5: Deploy to Kubernetes') {
+        // --- STAGE 6: DEPLOY TO KUBERNETES ---
+        stage('4: Deploy to Kubernetes') {
             steps {
                 script {
                     echo 'Updating K8s manifests with new image tags...'

@@ -28,15 +28,16 @@ pipeline {
     stage('1: Code Quality & Unit Tests') {
             steps {
                 dir('backend') {
+                    // Using triple double quotes and explicit bash execution for reliability.
                     sh """
-                        # We use /bin/bash -c to guarantee proper command chaining and file access
+                        # We use /bin/bash -c to guarantee proper command chaining inside the container
                         docker run --rm \\
                             -v \${PWD}:/app \\
                             -w /app \\
                             python:3.10-slim \\
                             /bin/bash -c \
-                            "pip install --no-cache-dir -r requirements.txt; \
-                             pytest; \
+                            "pip install --no-cache-dir -r requirements.txt && \
+                             pytest && \
                              flake8"
                     """
                     

@@ -48,9 +48,13 @@ pipeline {
                 docker exec $CONTAINER_ID /bin/bash -c "
                     cd /app && \
                     pip install --no-cache-dir -r requirements.txt && \
-                    pip install pytest flake8 && \
-                    pytest || true && \
-                    flake8
+                    if ls test_*.py >/dev/null 2>&1; then
+                        echo '✅ Test files found — running pytest and flake8...'; \
+                        pytest && flake8; \
+                    else
+                        echo '⚠️  No test files found — skipping pytest.'; \
+                        flake8; \
+                    fi
                 "
 
                 echo "Cleaning up container..."

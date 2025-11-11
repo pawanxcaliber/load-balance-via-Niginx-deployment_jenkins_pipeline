@@ -50,14 +50,18 @@ pipeline {
             steps {
                 dir('backend') {
                     echo 'Running Snyk Open Source dependency vulnerability scan...'
+                    
+                    // --- FIX: Use the full path to the Snyk binary ---
+                    def snykPath = "/usr/local/bin/snyk"
+                    
                     // Authenticates the CLI using the injected environment variable
-                    sh 'snyk auth $SNYK_TOKEN'
+                    sh "${snykPath} auth \$SNYK_TOKEN"
                     
                     // Scan dependencies (Python requirements.txt) - set to fail on high severity
-                    sh 'snyk test --file=requirements.txt --severity-threshold=high'
+                    sh "${snykPath} test --file=requirements.txt --severity-threshold=high"
                     
                     // Scan infrastructure (Dockerfile)
-                    sh 'snyk monitor --file=Dockerfile --docker'
+                    sh "${snykPath} monitor --file=Dockerfile --docker"
                 }
             }
         }

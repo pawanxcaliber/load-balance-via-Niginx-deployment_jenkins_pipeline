@@ -28,21 +28,14 @@ pipeline {
     steps {
         dir('backend') {
             sh '''
-                # Create a temporary container, copy code inside, run tests
-                docker create --name testcontainer python:3.10-slim
-                docker cp . testcontainer:/app
-                docker start -a testcontainer
-                docker exec testcontainer /bin/bash -c "
-                    cd /app && \
-                    pip install -r requirements.txt && \
-                    pytest && \
-                    flake8
-                "
-                docker rm -f testcontainer
+                pip install -r requirements.txt
+                pytest
+                flake8
             '''
         }
     }
 }
+
 
 
         stage('2: SonarQube Analysis') {

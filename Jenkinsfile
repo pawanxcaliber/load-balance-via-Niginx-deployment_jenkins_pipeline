@@ -28,24 +28,20 @@ pipeline {
                     echo 'Setting up Docker environment for Minikube...'
                     sh 'eval $(minikube docker-env)'
                     
-                    echo 'Installing Node.js and Snyk CLI...'
+                    echo 'Installing Snyk CLI using a dedicated root container...'
+                    
+                    // We run an Alpine container (small) as root, mount the Jenkins workspace
+                    // and use npm/apk to install Snyk into the host's (Jenkins container's) PATH.
                     sh '''
-                        # The safest way is to ensure all operations run without privilege issues.
-                        # This command chain should be run as root (or a user with permissions).
-                        
-                        # Fix: Create or ensure permissions for the apt-get lists directory
-                        mkdir -p /var/lib/apt/lists/partial
-                        chmod 755 /var/lib/apt/lists/partial
-                        
-                        # Installation steps
-                        apt-get update
-                        apt-get install -y curl
-                        curl -sL https://deb.nodesource.com/setup_18.x | bash -
-                        apt-get install -y nodejs
-                        
-                        npm install -g snyk
-                        echo 'Snyk CLI installed and ready.'
+                        # Install Node.js and Snyk CLI directly onto the Jenkins agent's filesystem 
+                        # by mounting the /usr/local directory where binaries are stored.
+                        docker run --rm \\
+                            -v /usr/local:/mnt/local \\
+                            node:18-alpine \\
+                            /bin/sh -c "npm install -g snyk --prefix /mnt/local"
                     '''
+                    
+                    echo 'Snyk CLI installed and ready in /usr/local/bin.'
                 }
             }
         }

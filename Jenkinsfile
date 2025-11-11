@@ -28,22 +28,21 @@ pipeline {
                     echo 'Setting up Docker environment for Minikube...'
                     sh 'eval $(minikube docker-env)'
                     
-                    echo 'Installing Node.js and Snyk CLI...'
+                    echo 'Installing Node.js and Snyk CLI with sudo...'
                     sh '''
-                        # Install Node.js and npm (required for Snyk CLI)
-                        apt-get update
-                        apt-get install -y curl
-                        curl -sL https://deb.nodesource.com/setup_18.x | bash -
-                        apt-get install -y nodejs
+                        # Run all commands that require root access using 'sudo'
+                        sudo apt-get update
+                        sudo apt-get install -y curl
+                        sudo curl -sL https://deb.nodesource.com/setup_18.x | sudo bash -
+                        sudo apt-get install -y nodejs
                         
-                        # Install Snyk CLI globally
-                        npm install -g snyk
+                        # npm install often needs sudo for global packages
+                        sudo npm install -g snyk
                         echo 'Snyk CLI installed and ready.'
                     '''
                 }
             }
         }
-
         // --- STAGE 3: SECURITY SCAN (SNYK) ---
         stage('1: Snyk Vulnerability Scan') {
             steps {

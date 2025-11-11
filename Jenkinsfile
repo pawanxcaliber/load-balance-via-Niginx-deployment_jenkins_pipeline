@@ -21,63 +21,41 @@ pipeline {
             }
         }
 
-        // --- STAGE 2: MINIKUBE ENVIRONMENT SETUP & DEPENDENCIES ---
-        stage('0: Setup Minikube Environment & Install Snyk') {
+        // --- STAGE 2: MINIKUBE ENVIRONMENT SETUP ---
+        // This stage is simplified to only set up the Docker environment.
+        // All Snyk installation logic has been removed.
+        stage('0: Setup Minikube Environment') {
             steps {
                 script {
                     echo 'Setting up Docker environment for Minikube...'
                     sh 'eval $(minikube docker-env)'
-                    
-                    // --- OPTIMIZATION: Check if Snyk is already installed ---
-                    def snykPath = "/usr/local/bin/snyk"
-                    def snykInstalled = false
-
-                    try {
-                        // Check if the file exists using the 'sh' step. 
-                        // If it runs without throwing an exception, the file exists.
-                        sh "test -x ${snykPath}"
-                        snykInstalled = true
-                    } catch (Exception e) {
-                        // test -x failed (returned exit code 1 or 2), which means the file is not there.
-                        snykInstalled = false
-                    }
-
-                    if (snykInstalled) {
-                        echo "✅ Snyk CLI already found at ${snykPath}. Skipping installation."
-                    } else {
-                        echo 'Snyk CLI not found. Installing Snyk CLI using a dedicated root container...'
-                        
-                        sh '''
-                            docker run --rm \\
-                                -v /usr/local:/mnt/local \\
-                                node:18-alpine \\
-                                /bin/sh -c "npm install -g snyk --prefix /mnt/local"
-                        '''
-                        echo 'Snyk CLI installed and ready in /usr/local/bin.'
-                    }
                 }
             }
         }
+        
         // --- STAGE 3: SECURITY SCAN (SNYK) ---
+        // CRITICAL FIX: Use the official snyk/snyk Docker image as the agent for this stage.
         stage('1: Snyk Vulnerability Scan') {
+            // The pipeline temporarily switches the agent for this stage only
+            agent {
+                docker {
+                    image 'snyk/snyk' 
+                    // Mount the Docker socket so Snyk can scan the Dockerfile/image later if needed.
+                    args '-v /var/run/docker.sock:/var/run/docker.sock'
+                }
+            }
             steps {
                 dir('backend') {
-                    // Wrap the variable declaration and command execution in a 'script' block
-                    script {
-                        echo 'Running Snyk Open Source dependency vulnerability scan...'
-                        
-                        // --- FIX: Use the full path to the Snyk binary ---
-                        def snykPath = "/usr/local/bin/snyk"
-                        
-                        // Authenticates the CLI using the injected environment variable
-                        sh "${snykPath} auth \$SNYK_TOKEN"
-                        
-                        // Scan dependencies (Python requirements.txt) - set to fail on high severity
-                        sh "${snykPath} test --file=requirements.txt --severity-threshold=high"
-                        
-                        // Scan infrastructure (Dockerfile)
-                        sh "${snykPath} monitor --file=Dockerfile --docker"
-                    }
+                    echo 'Running Snyk Open Source dependency vulnerability scan inside snyk/snyk container...'
+                    
+                    // The 'snyk' command is now directly available in the container's PATH.
+                    sh "snyk auth \$SNYK_TOKEN"
+                    
+                    // Scan dependencies (Python requirements.txt) - set to fail on high severity
+                    sh "snyk test --file=requirements.txt --severity-threshold=high"
+                    
+                    // Scan infrastructure (Dockerfile)
+                    sh "snyk monitor --file=Dockerfile --docker"
                 }
             }
         }

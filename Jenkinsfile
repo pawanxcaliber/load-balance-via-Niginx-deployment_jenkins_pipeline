@@ -121,21 +121,22 @@ pipeline {
                     
                     // Execute kubectl from the container with CRITICAL VOLUME MOUNTS
                    // This entire block replaces the previous failing sh '''...''' block in Stage 4
+// This entire block replaces the failing sh '''...''' block in Stage 4
 sh '''
     echo 'Executing kubectl commands inside container...'
-    # CRITICAL FIX: Add --entrypoint /bin/bash to explicitly run the shell, not kubectl
+    # Use the simple path for the inner shell (it needs a single quote, handled by Groovy)
+    # Use the KUBE_... environment variables that are INHERITED from the Jenkins Pod
     docker run --rm \\
         --entrypoint /bin/bash \\
         -v ${PWD}:/app \\
         -w /app \\
         -v /var/run/secrets/kubernetes.io/serviceaccount:/var/run/secrets/kubernetes.io/serviceaccount:ro \\
+        # Pass the critical environment variables that define the API server location
+        -e KUBERNETES_SERVICE_HOST -e KUBERNETES_SERVICE_PORT \\
         bitnami/kubectl:latest -c '
         
-        # Bash now sees $1, not Groovy.
-        export KUBERNETES_SERVICE_HOST=$(cat /etc/hosts | grep kubernetes | awk "{print \$1}")
-        export KUBERNETES_SERVICE_PORT=443
-        
-        # Apply the manifests
+        # Apply the manifests: The path is now simply quoted for the shell to handle the apostrophe
+        # The file system sees the mounted /app/K8's
         kubectl apply -f "K8\\''s/"
 
         # Wait for rollout status
@@ -145,7 +146,7 @@ sh '''
 '''
                     echo 'Deployment completed.'
                 }
-            }
+            } 
         }
         
     }

@@ -120,21 +120,23 @@ pipeline {
                     echo 'Applying K8s manifests...'
                     
                     // Execute kubectl from the container with CRITICAL VOLUME MOUNTS
-                   sh '''
+                   // This entire block replaces the previous failing sh '''...''' block in Stage 4
+sh '''
     echo 'Executing kubectl commands inside container...'
-    docker run --rm -v ${PWD}:/app -w /app -v /var/run/secrets/kubernetes.io/serviceaccount:/var/run/secrets/kubernetes.io/serviceaccount:ro bitnami/kubectl:latest /bin/bash -c "
-        # Ensure kubectl is configured to use the mounted token
-        # Escaping $1
-        export KUBERNETES_SERVICE_HOST=\$(cat /etc/hosts | grep kubernetes | awk '{print \$1}')
+    # CRITICAL FIX: Use single-quotes for the inner BASH script to disable Groovy interpolation
+    docker run --rm -v ${PWD}:/app -w /app -v /var/run/secrets/kubernetes.io/serviceaccount:/var/run/secrets/kubernetes.io/serviceaccount:ro bitnami/kubectl:latest /bin/bash -c '
+        # Bash now sees $1, not Groovy.
+        export KUBERNETES_SERVICE_HOST=$(cat /etc/hosts | grep kubernetes | awk "{print \$1}")
         export KUBERNETES_SERVICE_PORT=443
         
-        # Apply the manifests
-        kubectl apply -f \"K8's/\"
+        # Apply the manifests: K8s path now has the highest level of stability.
+        # Note: We use double quotes inside the single quote to handle the K8's path
+        kubectl apply -f "K8\\''s/"
 
         # Wait for rollout status
         kubectl rollout status deployment backend-deployment --timeout=5m
         kubectl rollout status deployment frontend-deployment --timeout=5m
-    "
+    '
 '''
                     echo 'Deployment completed.'
                 }

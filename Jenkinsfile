@@ -22,7 +22,7 @@ pipeline {
         }
 
         // --- STAGE 2: MINIKUBE ENVIRONMENT SETUP ---
-        // This stage is simplified as the crucial Docker setup is moved to Stage 1.
+        // This stage is simplified as the crucial Docker setup is handled in Stage 1.
         stage('0: Setup Minikube Environment') {
             steps {
                 echo 'Docker environment setup is deferred to Stage 1 for robustness.'
@@ -34,27 +34,33 @@ pipeline {
             steps {
                 dir('backend') {
                     script {
-                        // CRITICAL FIX: Set up Docker environment
+                        // CRITICAL FIX: Set up Docker environment immediately before running docker commands
                         sh 'eval $(minikube docker-env)' 
                         echo 'Docker environment setup confirmed.'
                         
-                        // FIX: Using the verified image name: snyk/snyk:linux-preview
-                        docker.image('snyk/snyk:linux-preview').withRun('-v /var/run/docker.sock:/var/run/docker.sock') { container ->
-                            echo 'Running Snyk Open Source dependency vulnerability scan inside snyk/snyk:linux-preview container...'
-                            
-                            // The 'snyk' command is available in the container's PATH.
-                            sh "snyk auth \$SNYK_TOKEN"
-                            
-                            // Scan dependencies (Python requirements.txt) - set to fail on high severity
-                            sh "snyk test --file=requirements.txt --severity-threshold=high"
-                            
-                            // Scan infrastructure (Dockerfile)
-                            sh "snyk monitor --file=Dockerfile --docker"
-                        }
+                        echo 'Running Snyk scan via direct docker run command using verified image tag...'
+                        
+                        // Execute all Snyk commands inside a single, robust sh block
+                        sh '''
+                            # Use the verified image tag: snyk/snyk:linux-preview
+                            # Mounts current directory (PWD) as /app and sets /app/backend as working directory.
+                            # Passes SNYK_TOKEN as an environment variable to the container.
+                            docker run --rm \\
+                                -v ${PWD}:/app \\
+                                -w /app/backend \\
+                                -e SNYK_TOKEN \\
+                                -v /var/run/docker.sock:/var/run/docker.sock \\
+                                snyk/snyk:linux-preview \\
+                                /bin/sh -c "snyk auth \$SNYK_TOKEN && \\
+                                            snyk test --file=requirements.txt --severity-threshold=high && \\
+                                            snyk monitor --file=Dockerfile --docker"
+                        '''
+                        echo 'Snyk scan completed.'
                     }
                 }
             }
         }
+
         // --- STAGE 4: CODE QUALITY (Flake8) ---
         stage('2: Code Quality (Flake8 only)') {
             steps {

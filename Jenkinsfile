@@ -105,34 +105,26 @@ pipeline {
         // --- STAGE 6: DEPLOY TO KUBERNETES ---
         stage('4: Deploy to Kubernetes') {
             steps {
-                dir('K8\'s') { // Change directory to K8's folder for easier paths
-                    script {
-                        echo 'Running deployment commands inside bitnami/kubectl container...'
+                script {
+                    echo 'Updating K8s manifests with new image tags...'
 
-                        // Use a triple-quoted shell block to execute commands inside the kubectl container
-                        sh '''
-                            # Run all kubectl commands inside the dedicated container
-                            docker run --rm \\
-                                -v ${PWD}/../:/app \\
-                                -w /app \\
-                                -v ~/.kube/config:/root/.kube/config:ro \\
-                                bitnami/kubectl:latest /bin/sh -c "
-                                    # 1. Update K8s manifests (using a different sed here for simplicity)
-                                    sed -i 's|devsecops-project-backend:.*|devsecops-project-backend:${DOCKER_IMAGE_TAG}|g' K8\\'s/02-backend-deployment.yaml
-                                    sed -i 's|devsecops-project-frontend:.*|devsecops-project-frontend:${DOCKER_IMAGE_TAG}|g' K8\\'s/03-frontend-deployment.yaml
+                    // Use the Minikube environment to ensure Docker works for the sed commands
+                    sh 'eval $(minikube docker-env)'
+                    
+                    // FIX: Changed dir path escaping to simple double-quotes for stability
+                    sh "sed -i 's|${BACKEND_IMAGE}:.*|${BACKEND_IMAGE}:${DOCKER_IMAGE_TAG}|g' \"K8's/02-backend-deployment.yaml\""
+                    sh "sed -i 's|${FRONTEND_IMAGE}:.*|${FRONTEND_IMAGE}:${DOCKER_IMAGE_TAG}|g' \"K8's/03-frontend-deployment.yaml\""
 
-                                    # 2. Apply K8s manifests
-                                    kubectl apply -f K8\\'s
+                    echo 'Applying K8s manifests using minikube kubectl...'
+                    // CRITICAL FIX: Use 'minikube kubectl --' to execute the command reliably
+                    sh "minikube kubectl -- apply -f \"K8's\"" 
 
-                                    # 3. Wait for deployment rollouts
-                                    kubectl rollout status deployment backend-deployment --timeout=5m
-                                    kubectl rollout status deployment frontend-deployment --timeout=5m
-                                "
-                        '''
-                        echo 'Deployment completed.'
-                    }
+                    echo 'Waiting for deployment rollouts to complete...'
+                    sh "minikube kubectl -- rollout status deployment backend-deployment --timeout=5m"
+                    sh "minikube kubectl -- rollout status deployment frontend-deployment --timeout=5m"
                 }
             }
         }
+        
     }
 }

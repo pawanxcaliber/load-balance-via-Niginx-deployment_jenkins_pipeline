@@ -123,14 +123,19 @@ pipeline {
                    // This entire block replaces the previous failing sh '''...''' block in Stage 4
 sh '''
     echo 'Executing kubectl commands inside container...'
-    # CRITICAL FIX: Use single-quotes for the inner BASH script to disable Groovy interpolation
-    docker run --rm -v ${PWD}:/app -w /app -v /var/run/secrets/kubernetes.io/serviceaccount:/var/run/secrets/kubernetes.io/serviceaccount:ro bitnami/kubectl:latest /bin/bash -c '
+    # CRITICAL FIX: Add --entrypoint /bin/bash to explicitly run the shell, not kubectl
+    docker run --rm \\
+        --entrypoint /bin/bash \\
+        -v ${PWD}:/app \\
+        -w /app \\
+        -v /var/run/secrets/kubernetes.io/serviceaccount:/var/run/secrets/kubernetes.io/serviceaccount:ro \\
+        bitnami/kubectl:latest -c '
+        
         # Bash now sees $1, not Groovy.
         export KUBERNETES_SERVICE_HOST=$(cat /etc/hosts | grep kubernetes | awk "{print \$1}")
         export KUBERNETES_SERVICE_PORT=443
         
-        # Apply the manifests: K8s path now has the highest level of stability.
-        # Note: We use double quotes inside the single quote to handle the K8's path
+        # Apply the manifests
         kubectl apply -f "K8\\''s/"
 
         # Wait for rollout status

@@ -122,15 +122,27 @@ pipeline {
                     // Execute kubectl from the container with CRITICAL VOLUME MOUNTS
                    // This entire block replaces the previous failing sh '''...''' block in Stage 4
 // This entire block replaces the failing sh '''...''' block in Stage 4
+// This entire block replaces the failing sh '''...''' block in Stage 4
 sh '''
     echo 'Executing kubectl commands inside container...'
-    # Ensure no backslash or space breaks the command before the image name
-    docker run --rm --entrypoint /bin/bash -v ${PWD}:/app -w /app -v /var/run/secrets/kubernetes.io/serviceaccount:/var/run/secrets/kubernetes.io/serviceaccount:ro -e KUBERNETES_SERVICE_HOST -e KUBERNETES_SERVICE_PORT bitnami/kubectl:latest -c '
+    
+    # CRITICAL FIX: Explicitly set KUBERNETES_SERVER and use /var/run/... for token
+    docker run --rm \\
+        --entrypoint /bin/bash \\
+        -v ${PWD}:/app \\
+        -w /app/K8\\'s \\
+        -v /var/run/secrets/kubernetes.io/serviceaccount:/var/run/secrets/kubernetes.io/serviceaccount:ro \\
+        -e KUBERNETES_SERVICE_HOST \\
+        -e KUBERNETES_SERVICE_PORT \\
+        bitnami/kubectl:latest -c '
         
-        # Apply the manifests
-        kubectl apply -f "K8\\''s/"
+        # 1. Apply the manifests: Since the working directory is now /app/K8\\'s,
+        # we can apply manifests from the current directory (.).
+        # The environment variables passed above (KUBERNETES_SERVICE_HOST/PORT)
+        # combined with the mounted service account should force in-cluster auth.
+        kubectl apply -f .
 
-        # Wait for rollout status
+        # 2. Wait for rollout status (Note: The rollout status command does not need the path)
         kubectl rollout status deployment backend-deployment --timeout=5m
         kubectl rollout status deployment frontend-deployment --timeout=5m
     '

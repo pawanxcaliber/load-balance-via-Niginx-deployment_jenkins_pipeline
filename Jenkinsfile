@@ -102,37 +102,44 @@ pipeline {
         }
 
         // --- STAGE 6: DEPLOY TO KUBERNETES ---
-        // --- STAGE 6: DEPLOY TO KUBERNETES ---
         stage('4: Deploy to Kubernetes') {
     steps {
         script {
-            echo 'Running deployment commands inside a kubectl container with Service Account access...'
+            echo 'Updating Kubernetes manifests with latest image tags...'
 
-            // Update image tags dynamically
+            // Update image tags dynamically in YAML manifests
             sh """
-                sed -i 's|${BACKEND_IMAGE}:.*|${BACKEND_IMAGE}:${DOCKER_IMAGE_TAG}|g' "K8's/02-backend-deployment.yaml"
-                sed -i 's|${FRONTEND_IMAGE}:.*|${FRONTEND_IMAGE}:${DOCKER_IMAGE_TAG}|g' "K8's/03-frontend-deployment.yaml"
+                sed -i 's|${BACKEND_IMAGE}:.*|${BACKEND_IMAGE}:${DOCKER_IMAGE_TAG}|g' K8s/02-backend-deployment.yaml
+                sed -i 's|${FRONTEND_IMAGE}:.*|${FRONTEND_IMAGE}:${DOCKER_IMAGE_TAG}|g' K8s/03-frontend-deployment.yaml
             """
 
-            echo 'Applying K8s manifests...'
+            echo 'Applying Kubernetes manifests...'
+            
+            // Run kubectl inside the container safely using a here-doc
+            sh '''
+                echo "Executing final deployment commands..."
+                docker run --rm \
+                    --entrypoint /bin/sh \
+                    -v "$(pwd)":/app \
+                    -w /app/K8s \
+                    -v /var/run/secrets/kubernetes.io/serviceaccount:/var/run/secrets/kubernetes.io/serviceaccount:ro \
+                    -e KUBERNETES_SERVICE_HOST \
+                    -e KUBERNETES_SERVICE_PORT \
+                    bitnami/kubectl:latest <<'EOF'
+                    
+                    echo "Inside kubectl container..."
+                    kubectl version --client || exit 1
+                    kubectl apply -f .
+                    kubectl rollout status deployment/backend-deployment --timeout=5m
+                    kubectl rollout status deployment/frontend-deployment --timeout=5m
+                    EOF
+            '''
 
-            // Run kubectl inside the container with proper quoting
-            sh """
-                echo 'Executing final deployment commands...'
-                docker run --rm \\
-                    --entrypoint /bin/sh \\
-                    -v \$(pwd):/app \\
-                    -w /app/K8's \\
-                    -v /var/run/secrets/kubernetes.io/serviceaccount:/var/run/secrets/kubernetes.io/serviceaccount:ro \\
-                    -e KUBERNETES_SERVICE_HOST \\
-                    -e KUBERNETES_SERVICE_PORT \\
-                    bitnami/kubectl:latest -c "kubectl apply -f . && \\
-                        kubectl rollout status deployment/backend-deployment --timeout=5m && \\
-                        kubectl rollout status deployment/frontend-deployment --timeout=5m"
-            """
+            echo '✅ Deployment completed successfully.'
         }
     }
 }
+
 
         
     }

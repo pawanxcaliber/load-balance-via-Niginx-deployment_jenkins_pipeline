@@ -105,18 +105,22 @@ pipeline {
         // --- STAGE 6: DEPLOY TO KUBERNETES ---
         stage('4: Deploy to Kubernetes') {
             steps {
-                // This stage must run as 'script' block
-                script {
+                // Ensure the script block is here
+                script { 
                     echo 'Running deployment commands inside a kubectl container with Service Account access...'
 
-                    sh '''
-                        # 1. Update K8s manifests (doing this in the agent shell is easier)
-                        sed -i 's|${BACKEND_IMAGE}:.*|${BACKEND_IMAGE}:${DOCKER_IMAGE_TAG}|g' "K8\\'s/02-backend-deployment.yaml"
-                        sed -i 's|${FRONTEND_IMAGE}:.*|${FRONTEND_IMAGE}:${DOCKER_IMAGE_TAG}|g' "K8\\'s/03-frontend-deployment.yaml"
+                    // Move sed commands to the agent shell where they are simpler, 
+                    // but we must fix the path quoting.
 
-                        echo 'Applying K8s manifests...'
-                        
-                        # Execute kubectl from the container with CRITICAL VOLUME MOUNTS
+                    // CRITICAL FIX: Use simple double-quotes for Groovy and wrap the path in BASH double-quotes
+                    echo 'Updating K8s manifests...'
+                    sh "sed -i 's|${BACKEND_IMAGE}:.*|${BACKEND_IMAGE}:${DOCKER_IMAGE_TAG}|g' \"K8's/02-backend-deployment.yaml\""
+                    sh "sed -i 's|${FRONTEND_IMAGE}:.*|${FRONTEND_IMAGE}:${DOCKER_IMAGE_TAG}|g' \"K8's/03-frontend-deployment.yaml\""
+
+                    echo 'Applying K8s manifests...'
+                    
+                    // Execute kubectl from the container with CRITICAL VOLUME MOUNTS
+                    sh '''
                         docker run --rm \\
                             -v ${PWD}:/app \\
                             -w /app \\
@@ -127,7 +131,7 @@ pipeline {
                                 export KUBERNETES_SERVICE_PORT=443
 
                                 # Apply the manifests
-                                kubectl apply -f K8\\'s/
+                                kubectl apply -f \"K8's/\"
 
                                 # Wait for rollout status
                                 kubectl rollout status deployment backend-deployment --timeout=5m

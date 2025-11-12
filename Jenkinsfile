@@ -102,15 +102,21 @@ pipeline {
         }
 
         // --- STAGE 6: DEPLOY TO KUBERNETES ---
+        // --- STAGE 6: DEPLOY TO KUBERNETES ---
         stage('4: Deploy to Kubernetes') {
             steps {
                 script {
                     echo 'Updating K8s manifests with new image tags...'
-                    sh "sed -i 's|${BACKEND_IMAGE}:.*|${BACKEND_IMAGE}:${DOCKER_IMAGE_TAG}|g' K8's/02-backend-deployment.yaml"
-                    sh "sed -i 's|${FRONTEND_IMAGE}:.*|${FRONTEND_IMAGE}:${DOCKER_IMAGE_TAG}|g' K8's/03-frontend-deployment.yaml"
+                    
+                    // FIX 1: Escape the apostrophe in the K8's path
+                    sh "sed -i 's|${BACKEND_IMAGE}:.*|${BACKEND_IMAGE}:${DOCKER_IMAGE_TAG}|g' K8\\'s/02-backend-deployment.yaml"
+                    
+                    // FIX 2: Escape the apostrophe in the K8's path
+                    sh "sed -i 's|${FRONTEND_IMAGE}:.*|${FRONTEND_IMAGE}:${DOCKER_IMAGE_TAG}|g' K8\\'s/03-frontend-deployment.yaml"
 
                     echo 'Applying K8s manifests...'
-                    sh 'kubectl apply -f K8\'s'
+                    // FIX 3: Escape the apostrophe in the K8's path
+                    sh 'kubectl apply -f K8\\'s'
 
                     echo 'Waiting for deployment rollouts to complete...'
                     sh "kubectl rollout status deployment backend-deployment --timeout=5m"

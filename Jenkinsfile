@@ -34,13 +34,13 @@ pipeline {
             steps {
                 dir('backend') {
                     script {
-                        // CRITICAL FIX: Set up Docker environment immediately before using the Docker plugin
+                        // CRITICAL FIX: Set up Docker environment
                         sh 'eval $(minikube docker-env)' 
                         echo 'Docker environment setup confirmed.'
                         
-                        // Launch the Snyk container (snyk/snyk) to run the scan
-                        docker.image('snyk/snyk').withRun('-v /var/run/docker.sock:/var/run/docker.sock') { container ->
-                            echo 'Running Snyk Open Source dependency vulnerability scan inside snyk/snyk container...'
+                        // FIX: Using the verified image name: snyk/snyk:linux-preview
+                        docker.image('snyk/snyk:linux-preview').withRun('-v /var/run/docker.sock:/var/run/docker.sock') { container ->
+                            echo 'Running Snyk Open Source dependency vulnerability scan inside snyk/snyk:linux-preview container...'
                             
                             // The 'snyk' command is available in the container's PATH.
                             sh "snyk auth \$SNYK_TOKEN"
@@ -55,7 +55,6 @@ pipeline {
                 }
             }
         }
-
         // --- STAGE 4: CODE QUALITY (Flake8) ---
         stage('2: Code Quality (Flake8 only)') {
             steps {

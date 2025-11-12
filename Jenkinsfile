@@ -103,40 +103,38 @@ pipeline {
 
         // --- STAGE 6: DEPLOY TO KUBERNETES ---
         // --- STAGE 6: DEPLOY TO KUBERNETES ---
-        // --- STAGE 6: DEPLOY TO KUBERNETES ---
         stage('4: Deploy to Kubernetes') {
             steps {
-                // Use the 'dir' step to simplify paths for the following steps
-                dir('K8\'s') {
-                    // Use a 'container' agent block or the 'withDockerRegistry' step 
-                    // if you are using the Kubernetes Pipeline Plugin
-                    // Since we are unsure of your agent config, we use a simple shell
-                    sh '''
-                        echo 'Updating K8s manifests...'
-                        sed -i 's|${BACKEND_IMAGE}:.*|${BACKEND_IMAGE}:${DOCKER_IMAGE_TAG}|g' 02-backend-deployment.yaml
-                        sed -i 's|${FRONTEND_IMAGE}:.*|${FRONTEND_IMAGE}:${DOCKER_IMAGE_TAG}|g' 03-frontend-deployment.yaml
+                // This stage must run as 'script' block
+                script {
+                    echo 'Running deployment commands inside a kubectl container with Service Account access...'
 
-                        echo 'Applying K8s manifests using the dedicated kubectl container...'
+                    sh '''
+                        # 1. Update K8s manifests (doing this in the agent shell is easier)
+                        sed -i 's|${BACKEND_IMAGE}:.*|${BACKEND_IMAGE}:${DOCKER_IMAGE_TAG}|g' "K8\\'s/02-backend-deployment.yaml"
+                        sed -i 's|${FRONTEND_IMAGE}:.*|${FRONTEND_IMAGE}:${DOCKER_IMAGE_TAG}|g' "K8\\'s/03-frontend-deployment.yaml"
+
+                        echo 'Applying K8s manifests...'
                         
-                        # Execute kubectl from the container. It uses the service account of the Jenkins pod.
+                        # Execute kubectl from the container with CRITICAL VOLUME MOUNTS
                         docker run --rm \\
                             -v ${PWD}:/app \\
                             -w /app \\
-                            # Mount the service account token for authentication
-                            --env KUBERNETES_SERVICE_HOST=$KUBERNETES_SERVICE_HOST \\
-                            --env KUBERNETES_SERVICE_PORT=$KUBERNETES_SERVICE_PORT \\
-                            --env KUBERNETES_PORT_443_TCP_ADDR=$KUBERNETES_PORT_443_TCP_ADDR \\
-                            --env KUBERNETES_PORT_443_TCP_PORT=$KUBERNETES_PORT_443_TCP_PORT \\
-                            --env KUBE_CONFIG_DATA=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token) \\
+                            -v /var/run/secrets/kubernetes.io/serviceaccount:/var/run/secrets/kubernetes.io/serviceaccount:ro \\
                             bitnami/kubectl:latest /bin/bash -c "
+                                # Ensure kubectl is configured to use the mounted token
+                                export KUBERNETES_SERVICE_HOST=\$(cat /etc/hosts | grep kubernetes | awk '{print \$1}')
+                                export KUBERNETES_SERVICE_PORT=443
+
                                 # Apply the manifests
-                                kubectl apply -f .
+                                kubectl apply -f K8\\'s/
 
                                 # Wait for rollout status
                                 kubectl rollout status deployment backend-deployment --timeout=5m
                                 kubectl rollout status deployment frontend-deployment --timeout=5m
                             "
                     '''
+                    echo 'Deployment completed.'
                 }
             }
         }

@@ -103,30 +103,34 @@ pipeline {
 
         // --- STAGE 6: DEPLOY TO KUBERNETES ---
         // --- STAGE 6: DEPLOY TO KUBERNETES ---
-        // --- STAGE 6: DEPLOY TO KUBERNETES ---
         stage('4: Deploy to Kubernetes') {
             steps {
-                script {
-                    echo 'Updating K8s manifests with new image tags...'
-                    
-                    // FIX 1: Use double quotes for Groovy string interpolation
-                    sh "sed -i 's|${BACKEND_IMAGE}:.*|${BACKEND_IMAGE}:${DOCKER_IMAGE_TAG}|g' K8\\'s/02-backend-deployment.yaml"
-                    
-                    // FIX 2: Use double quotes for Groovy string interpolation
-                    sh "sed -i 's|${FRONTEND_IMAGE}:.*|${FRONTEND_IMAGE}:${DOCKER_IMAGE_TAG}|g' K8\\'s/03-frontend-deployment.yaml"
+                dir('K8\'s') { // Change directory to K8's folder for easier paths
+                    script {
+                        echo 'Running deployment commands inside bitnami/kubectl container...'
 
-                    echo 'Applying K8s manifests...'
-                    // CRITICAL FIX: Use double quotes for Groovy string, and wrap the path in BASH double quotes
-                    // This way, the BASH shell sees: kubectl apply -f "K8's"
-                    sh "kubectl apply -f \"K8's\"" 
-                    
-                    // Alternatively, if the original Groovy single quote syntax worked elsewhere:
-                    // sh 'kubectl apply -f "K8'\''s"' 
-                    // But the first method is far cleaner.
+                        // Use a triple-quoted shell block to execute commands inside the kubectl container
+                        sh '''
+                            # Run all kubectl commands inside the dedicated container
+                            docker run --rm \\
+                                -v ${PWD}/../:/app \\
+                                -w /app \\
+                                -v ~/.kube/config:/root/.kube/config:ro \\
+                                bitnami/kubectl:latest /bin/sh -c "
+                                    # 1. Update K8s manifests (using a different sed here for simplicity)
+                                    sed -i 's|devsecops-project-backend:.*|devsecops-project-backend:${DOCKER_IMAGE_TAG}|g' K8\\'s/02-backend-deployment.yaml
+                                    sed -i 's|devsecops-project-frontend:.*|devsecops-project-frontend:${DOCKER_IMAGE_TAG}|g' K8\\'s/03-frontend-deployment.yaml
 
-                    echo 'Waiting for deployment rollouts to complete...'
-                    sh "kubectl rollout status deployment backend-deployment --timeout=5m"
-                    sh "kubectl rollout status deployment frontend-deployment --timeout=5m"
+                                    # 2. Apply K8s manifests
+                                    kubectl apply -f K8\\'s
+
+                                    # 3. Wait for deployment rollouts
+                                    kubectl rollout status deployment backend-deployment --timeout=5m
+                                    kubectl rollout status deployment frontend-deployment --timeout=5m
+                                "
+                        '''
+                        echo 'Deployment completed.'
+                    }
                 }
             }
         }

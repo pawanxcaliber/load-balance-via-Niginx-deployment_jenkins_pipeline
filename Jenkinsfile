@@ -104,53 +104,36 @@ pipeline {
         // --- STAGE 6: DEPLOY TO KUBERNETES ---
         // --- STAGE 6: DEPLOY TO KUBERNETES ---
         stage('4: Deploy to Kubernetes') {
-            steps {
-                // Ensure the script block is here
-                script { 
-                    echo 'Running deployment commands inside a kubectl container with Service Account access...'
+    steps {
+        script {
+            echo 'Running deployment commands inside a kubectl container with Service Account access...'
 
-                    // Move sed commands to the agent shell where they are simpler, 
-                    // but we must fix the path quoting.
+            // Update image tags dynamically
+            sh """
+                sed -i 's|${BACKEND_IMAGE}:.*|${BACKEND_IMAGE}:${DOCKER_IMAGE_TAG}|g' "K8's/02-backend-deployment.yaml"
+                sed -i 's|${FRONTEND_IMAGE}:.*|${FRONTEND_IMAGE}:${DOCKER_IMAGE_TAG}|g' "K8's/03-frontend-deployment.yaml"
+            """
 
-                    // CRITICAL FIX: Use simple double-quotes for Groovy and wrap the path in BASH double-quotes
-                    echo 'Updating K8s manifests...'
-                    sh "sed -i 's|${BACKEND_IMAGE}:.*|${BACKEND_IMAGE}:${DOCKER_IMAGE_TAG}|g' \"K8's/02-backend-deployment.yaml\""
-                    sh "sed -i 's|${FRONTEND_IMAGE}:.*|${FRONTEND_IMAGE}:${DOCKER_IMAGE_TAG}|g' \"K8's/03-frontend-deployment.yaml\""
+            echo 'Applying K8s manifests...'
 
-                    echo 'Applying K8s manifests...'
-                    
-                    // Execute kubectl from the container with CRITICAL VOLUME MOUNTS
-                   // This entire block replaces the previous failing sh '''...''' block in Stage 4
-// This entire block replaces the failing sh '''...''' block in Stage 4
-// This entire block replaces the failing sh '''...''' block in Stage 4
-sh '''
-    echo 'Executing final deployment commands...'
-    # Use sh -c for chaining commands reliably
-    docker run --rm \\
-        --entrypoint /bin/sh \\
-        -v ${PWD}:/app \\
-        -w /app/K8\\'s \\
-        -v /var/run/secrets/kubernetes.io/serviceaccount:/var/run/secrets/kubernetes.io/serviceaccount:ro \\
-        -e KUBERNETES_SERVICE_HOST \\
-        -e KUBERNETES_SERVICE_PORT \\
-        bitnami/kubectl:latest -c '
-        
-        # NOTE: kubectl is likely located at /opt/bitnami/kubectl/bin/kubectl or similar. 
-        # Since /bin/sh is running, we must ensure kubectl is in the PATH, or call it directly.
-        # Let's assume the PATH is correct and rely on the inherited environment.
-        
-        # Apply the manifests
-        kubectl apply -f . && \\
-
-        # Wait for rollout status
-        kubectl rollout status deployment backend-deployment --timeout=5m && \\
-        kubectl rollout status deployment frontend-deployment --timeout=5m
-    '
-'''
-                    echo 'Deployment completed.'
-                }
-            } 
+            // Run kubectl inside the container with proper quoting
+            sh """
+                echo 'Executing final deployment commands...'
+                docker run --rm \\
+                    --entrypoint /bin/sh \\
+                    -v \$(pwd):/app \\
+                    -w /app/K8's \\
+                    -v /var/run/secrets/kubernetes.io/serviceaccount:/var/run/secrets/kubernetes.io/serviceaccount:ro \\
+                    -e KUBERNETES_SERVICE_HOST \\
+                    -e KUBERNETES_SERVICE_PORT \\
+                    bitnami/kubectl:latest -c "kubectl apply -f . && \\
+                        kubectl rollout status deployment/backend-deployment --timeout=5m && \\
+                        kubectl rollout status deployment/frontend-deployment --timeout=5m"
+            """
         }
+    }
+}
+
         
     }
 }

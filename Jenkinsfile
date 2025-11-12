@@ -103,25 +103,40 @@ pipeline {
 
         // --- STAGE 6: DEPLOY TO KUBERNETES ---
         // --- STAGE 6: DEPLOY TO KUBERNETES ---
+        // --- STAGE 6: DEPLOY TO KUBERNETES ---
         stage('4: Deploy to Kubernetes') {
             steps {
-                script {
-                    echo 'Updating K8s manifests with new image tags...'
+                // Use the 'dir' step to simplify paths for the following steps
+                dir('K8\'s') {
+                    // Use a 'container' agent block or the 'withDockerRegistry' step 
+                    // if you are using the Kubernetes Pipeline Plugin
+                    // Since we are unsure of your agent config, we use a simple shell
+                    sh '''
+                        echo 'Updating K8s manifests...'
+                        sed -i 's|${BACKEND_IMAGE}:.*|${BACKEND_IMAGE}:${DOCKER_IMAGE_TAG}|g' 02-backend-deployment.yaml
+                        sed -i 's|${FRONTEND_IMAGE}:.*|${FRONTEND_IMAGE}:${DOCKER_IMAGE_TAG}|g' 03-frontend-deployment.yaml
 
-                    // Use the Minikube environment to ensure Docker works for the sed commands
-                    sh 'eval $(minikube docker-env)'
-                    
-                    // FIX: Changed dir path escaping to simple double-quotes for stability
-                    sh "sed -i 's|${BACKEND_IMAGE}:.*|${BACKEND_IMAGE}:${DOCKER_IMAGE_TAG}|g' \"K8's/02-backend-deployment.yaml\""
-                    sh "sed -i 's|${FRONTEND_IMAGE}:.*|${FRONTEND_IMAGE}:${DOCKER_IMAGE_TAG}|g' \"K8's/03-frontend-deployment.yaml\""
+                        echo 'Applying K8s manifests using the dedicated kubectl container...'
+                        
+                        # Execute kubectl from the container. It uses the service account of the Jenkins pod.
+                        docker run --rm \\
+                            -v ${PWD}:/app \\
+                            -w /app \\
+                            # Mount the service account token for authentication
+                            --env KUBERNETES_SERVICE_HOST=$KUBERNETES_SERVICE_HOST \\
+                            --env KUBERNETES_SERVICE_PORT=$KUBERNETES_SERVICE_PORT \\
+                            --env KUBERNETES_PORT_443_TCP_ADDR=$KUBERNETES_PORT_443_TCP_ADDR \\
+                            --env KUBERNETES_PORT_443_TCP_PORT=$KUBERNETES_PORT_443_TCP_PORT \\
+                            --env KUBE_CONFIG_DATA=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token) \\
+                            bitnami/kubectl:latest /bin/bash -c "
+                                # Apply the manifests
+                                kubectl apply -f .
 
-                    echo 'Applying K8s manifests using minikube kubectl...'
-                    // CRITICAL FIX: Use 'minikube kubectl --' to execute the command reliably
-                    sh "minikube kubectl -- apply -f \"K8's\"" 
-
-                    echo 'Waiting for deployment rollouts to complete...'
-                    sh "minikube kubectl -- rollout status deployment backend-deployment --timeout=5m"
-                    sh "minikube kubectl -- rollout status deployment frontend-deployment --timeout=5m"
+                                # Wait for rollout status
+                                kubectl rollout status deployment backend-deployment --timeout=5m
+                                kubectl rollout status deployment frontend-deployment --timeout=5m
+                            "
+                    '''
                 }
             }
         }

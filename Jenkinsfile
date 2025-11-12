@@ -40,21 +40,21 @@ pipeline {
                         
                         echo 'Running Snyk scan via direct docker run command using verified image tag...'
                         
-                        // Execute all Snyk commands inside a single, robust sh block
+                        // Check the quoting carefully here!
                         sh '''
                             # Use the verified image tag: snyk/snyk:linux-preview
-                            # Mounts current directory (PWD) as /app and sets /app/backend as working directory.
-                            # Passes SNYK_TOKEN as an environment variable to the container.
+                            # ${PWD} is a Groovy variable, but we wrap the shell block in single quotes, 
+                            # so Groovy interpolates it correctly before passing to sh.
                             docker run --rm \\
                                 -v ${PWD}:/app \\
                                 -w /app/backend \\
                                 -e SNYK_TOKEN \\
                                 -v /var/run/docker.sock:/var/run/docker.sock \\
                                 snyk/snyk:linux-preview \\
-                                /bin/sh -c "snyk auth \$SNYK_TOKEN && \\
+                                /bin/sh -c "snyk auth \\$SNYK_TOKEN && \\
                                             snyk test --file=requirements.txt --severity-threshold=high && \\
                                             snyk monitor --file=Dockerfile --docker"
-                        '''
+                        ''' // <-- Ensure this is correctly aligned and present
                         echo 'Snyk scan completed.'
                     }
                 }

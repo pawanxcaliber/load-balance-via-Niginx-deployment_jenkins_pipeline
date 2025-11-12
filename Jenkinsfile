@@ -121,23 +121,25 @@ pipeline {
                     
                     // Execute kubectl from the container with CRITICAL VOLUME MOUNTS
                     sh '''
-                        docker run --rm \\
-                            -v ${PWD}:/app \\
-                            -w /app \\
-                            -v /var/run/secrets/kubernetes.io/serviceaccount:/var/run/secrets/kubernetes.io/serviceaccount:ro \\
-                            bitnami/kubectl:latest /bin/bash -c "
-                                # Ensure kubectl is configured to use the mounted token
-                                export KUBERNETES_SERVICE_HOST=\$(cat /etc/hosts | grep kubernetes | awk '{print \$1}')
-                                export KUBERNETES_SERVICE_PORT=443
+    echo 'Executing kubectl commands inside container...'
+    docker run --rm \\
+        -v ${PWD}:/app \\
+        -w /app \\
+        -v /var/run/secrets/kubernetes.io/serviceaccount:/var/run/secrets/kubernetes.io/serviceaccount:ro \\
+        bitnami/kubectl:latest /bin/bash -c "
+            # Ensure kubectl is configured to use the mounted token
+            # Escaping $1
+            export KUBERNETES_SERVICE_HOST=\$(cat /etc/hosts | grep kubernetes | awk '{print \$1}')
+            export KUBERNETES_SERVICE_PORT=443
+            
+            # Apply the manifests
+            kubectl apply -f \"K8's/\"
 
-                                # Apply the manifests
-                                kubectl apply -f \"K8's/\"
-
-                                # Wait for rollout status
-                                kubectl rollout status deployment backend-deployment --timeout=5m
-                                kubectl rollout status deployment frontend-deployment --timeout=5m
-                            "
-                    '''
+            # Wait for rollout status
+            kubectl rollout status deployment backend-deployment --timeout=5m
+            kubectl rollout status deployment frontend-deployment --timeout=5m
+        "
+'''
                     echo 'Deployment completed.'
                 }
             }
